@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Challenge Rad</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0f0f13;
+    color: #fff;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  h1 {
+    font-size: clamp(1.2rem, 5vw, 2rem);
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    margin-bottom: clamp(16px, 4vw, 32px);
+    background: linear-gradient(135deg, #fff 0%, #aaa 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .wheel-wrapper {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* Pointer arrow at top */
+  .pointer {
+    width: 0;
+    height: 0;
+    border-left: 16px solid transparent;
+    border-right: 16px solid transparent;
+    border-top: 32px solid #fff;
+    filter: drop-shadow(0 2px 6px rgba(0,0,0,0.6));
+    z-index: 10;
+    margin-bottom: -4px;
+  }
+
+  canvas {
+    border-radius: 50%;
+    box-shadow: 0 0 60px rgba(255,255,255,0.08), 0 0 120px rgba(100,100,255,0.05);
+    cursor: pointer;
+  }
+
+  .spin-btn {
+    margin-top: clamp(16px, 4vw, 32px);
+    padding: clamp(12px, 3vw, 16px) clamp(32px, 8vw, 56px);
+    font-size: clamp(1rem, 3vw, 1.2rem);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    background: linear-gradient(135deg, #6c63ff, #e040fb);
+    border: none;
+    border-radius: 50px;
+    color: #fff;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
+    box-shadow: 0 4px 24px rgba(108,99,255,0.4);
+  }
+
+  .spin-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px rgba(108,99,255,0.55);
+  }
+
+  .spin-btn:active:not(:disabled) { transform: translateY(0); }
+  .spin-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .result {
+    margin-top: clamp(12px, 3vw, 24px);
+    min-height: 50px;
+    text-align: center;
+    font-size: clamp(1.3rem, 5vw, 2rem);
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    opacity: 0;
+    transform: translateY(12px);
+    transition: opacity 0.5s, transform 0.5s;
+  }
+  .result.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* Popup overlay */
+  .popup-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.65);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.35s;
+  }
+  .popup-overlay.visible {
+    opacity: 1;
+    pointer-events: all;
+  }
+  .popup {
+    background: #1c1c26;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 24px;
+    padding: clamp(28px, 8vw, 48px) clamp(24px, 8vw, 56px);
+    text-align: center;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.6);
+    transform: scale(0.85);
+    transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1);
+    max-width: 380px;
+    width: 90%;
+  }
+  .popup-overlay.visible .popup {
+    transform: scale(1);
+  }
+  .popup-label {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: #888;
+    margin-bottom: 16px;
+  }
+  .popup-result {
+    font-size: clamp(1.6rem, 6vw, 2.4rem);
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    line-height: 1.2;
+    margin-bottom: 32px;
+  }
+  .popup-close {
+    padding: 14px 40px;
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    background: linear-gradient(135deg, #6c63ff, #e040fb);
+    border: none;
+    border-radius: 50px;
+    color: #fff;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s;
+    box-shadow: 0 4px 20px rgba(108,99,255,0.4);
+  }
+  .popup-close:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(108,99,255,0.55); }
+  .popup-close:active { transform: translateY(0); }
+
+  /* Gear icon */
+  .gear-btn {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    width: 44px;
+    height: 44px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+    z-index: 100;
+  }
+  .gear-btn:hover { background: rgba(255,255,255,0.16); }
+  .gear-btn svg { width: 22px; height: 22px; fill: #ccc; }
+
+  /* Settings panel */
+  .settings-panel {
+    position: fixed;
+    top: 74px;
+    right: 20px;
+    background: #1c1c26;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 16px;
+    padding: 20px;
+    min-width: 240px;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+    z-index: 99;
+    display: none;
+  }
+  .settings-panel.open { display: block; }
+
+  .settings-panel h3 {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #888;
+    margin-bottom: 14px;
+  }
+
+  .mode-options { display: flex; flex-direction: column; gap: 10px; }
+
+  .mode-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    color: #ddd;
+  }
+
+  .mode-option input[type="radio"] { accent-color: #6c63ff; width: 16px; height: 16px; }
+
+  .manual-select {
+    margin-top: 14px;
+    width: 100%;
+    padding: 10px 12px;
+    background: #2a2a38;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 10px;
+    color: #fff;
+    font-size: 0.95rem;
+    outline: none;
+    cursor: pointer;
+    display: none;
+  }
+  .manual-select.visible { display: block; }
+  .manual-select option { background: #1c1c26; }
+</style>
+</head>
+<body>
+
+<h1>Challenge Rad</h1>
+
+<!-- Gear button -->
+<button class="gear-btn" id="gearBtn" title="Einstellungen">
+  <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <path d="M12 15.5A3.5 3.5 0 0 1 8.5 12 3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5m7.43-2.92c.04-.36.07-.73.07-1.08s-.03-.73-.07-1.08l2.34-1.83c.21-.16.27-.46.13-.7l-2.21-3.83c-.13-.23-.42-.31-.65-.23l-2.76 1.11c-.57-.44-1.18-.81-1.86-1.08L14.21 1.2C14.16.94 13.92.75 13.65.75h-3.3c-.27 0-.5.19-.55.45L9.53 3.58c-.68.27-1.3.64-1.86 1.08L4.91 3.55c-.23-.09-.52 0-.65.23L2.05 7.61c-.14.24-.08.54.13.7l2.34 1.83C4.47 10.53 4.44 10.85 4.44 11.18c0 .34.03.67.08 1H2.18c-.21.16-.27.46-.13.7l2.21 3.83c.13.23.42.31.65.23l2.76-1.11c.57.44 1.18.81 1.86 1.08l.27 2.38c.05.26.28.45.55.45h3.3c.27 0 .5-.19.55-.45l.27-2.38c.68-.27 1.3-.64 1.86-1.08l2.76 1.11c.23.09.52 0 .65-.23l2.21-3.83c.14-.24.08-.54-.13-.7z"/>
+  </svg>
+</button>
+
+<!-- Settings panel -->
+<div class="settings-panel" id="settingsPanel">
+  <h3>Spin-Modus</h3>
+  <div class="mode-options">
+    <label class="mode-option">
+      <input type="radio" name="mode" value="random" checked> Zufällig
+    </label>
+    <label class="mode-option">
+      <input type="radio" name="mode" value="manual"> Manuell
+    </label>
+  </div>
+  <select class="manual-select" id="manualSelect">
+    <option value="0">Laufen gehen</option>
+    <option value="1">Spazieren gehen</option>
+    <option value="2">Trainieren</option>
+    <option value="3">Freund fragen</option>
+    <option value="4">Essen holen</option>
+    <option value="5">Quiz machen</option>
+  </select>
+</div>
+
+<div class="wheel-wrapper">
+  <div class="pointer"></div>
+  <canvas id="wheel" width="460" height="460"></canvas>
+</div>
+
+<button class="spin-btn" id="spinBtn">DREHEN</button>
+
+<div class="result" id="result"></div>
+
+<!-- Popup -->
+<div class="popup-overlay" id="popupOverlay">
+  <div class="popup">
+    <div class="popup-label">DEINE AUFGABE</div>
+    <div class="popup-result" id="popupResult"></div>
+    <button class="popup-close" id="popupClose">OK</button>
+  </div>
+</div>
+
+<script>
+const SEGMENTS = [
+  { label: 'Laufen gehen',    color: '#FF4B6E' },
+  { label: 'Spazieren', color: '#FF9F1C' },
+  { label: 'Trainieren',      color: '#2DCB75' },
+  { label: 'Freund fragen',   color: '#00B4D8' },
+  { label: 'Essen holen',     color: '#9B5DE5' },
+  { label: 'Quiz machen',     color: '#F72585' },
+];
+
+const N = SEGMENTS.length;
+const SLICE = (2 * Math.PI) / N;
+const canvas = document.getElementById('wheel');
+const ctx = canvas.getContext('2d');
+
+let cx, cy, R;
+
+function resizeCanvas() {
+  const size = Math.min(window.innerWidth - 40, 460);
+  canvas.width = size;
+  canvas.height = size;
+  cx = size / 2;
+  cy = size / 2;
+  R = size / 2 - 4;
+  drawWheel(currentAngle);
+}
+
+window.addEventListener('resize', resizeCanvas);
+
+let currentAngle = 0; // radians, rotation of the wheel
+let spinning = false;
+
+function drawWheel(angle) {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  for (let i = 0; i < N; i++) {
+    const start = angle + i * SLICE;
+    const end = start + SLICE;
+
+    // Segment
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, R, start, end);
+    ctx.closePath();
+    ctx.fillStyle = SEGMENTS[i].color;
+    ctx.fill();
+    ctx.strokeStyle = '#0f0f13';
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+
+    // Label
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(start + SLICE / 2);
+    const fontSize = Math.round(canvas.width * 0.041);
+    ctx.font = `bold ${fontSize}px "Segoe UI", system-ui, sans-serif`;
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(0,0,0,0.9)';
+    ctx.lineWidth = 2.5;
+    ctx.lineJoin = 'round';
+
+    // Manual letter spacing
+    const text = SEGMENTS[i].label;
+    const letterSpacing = 1.5;
+    const totalWidth = text.split('').reduce((w, ch) => w + ctx.measureText(ch).width + letterSpacing, 0) - letterSpacing;
+    let xPos = R - 18 - totalWidth;
+    for (const ch of text) {
+      ctx.strokeText(ch, xPos, 6);
+      ctx.fillStyle = '#fff';
+      ctx.fillText(ch, xPos, 6);
+      xPos += ctx.measureText(ch).width + letterSpacing;
+    }
+    ctx.restore();
+  }
+
+  // Center circle
+  ctx.beginPath();
+  ctx.arc(cx, cy, 22, 0, 2 * Math.PI);
+  ctx.fillStyle = '#0f0f13';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+}
+
+resizeCanvas();
+
+// ---- Spin logic ----
+
+function getMode() {
+  return document.querySelector('input[name="mode"]:checked').value;
+}
+
+function getTargetAngle(targetSegmentIndex) {
+  // The pointer is at top (angle -PI/2 in standard coords, but since we draw from angle=0
+  // as "right", the top is at -PI/2). We want segment targetSegmentIndex to be centered at top.
+  // Segment i center (mid-arc) when wheel is at rotation `angle`:
+  //   midArc = angle + i*SLICE + SLICE/2
+  // We want midArc = -PI/2 + 2*PI*k  =>  angle = -PI/2 - i*SLICE - SLICE/2 + 2*PI*k
+
+  const target = -Math.PI / 2 - (targetSegmentIndex * SLICE + SLICE / 2);
+  return target;
+}
+
+document.getElementById('spinBtn').addEventListener('click', spin);
+
+function spin() {
+  if (spinning) return;
+  spinning = true;
+
+  const resultEl = document.getElementById('result');
+  resultEl.classList.remove('visible');
+  resultEl.textContent = '';
+
+  const mode = getMode();
+  let finalAngle;
+
+  if (mode === 'random') {
+    // Random full rotations + random stop
+    const extraSpins = (8 + Math.floor(Math.random() * 6)) * 2 * Math.PI;
+    const randomStop = Math.random() * 2 * Math.PI;
+    finalAngle = currentAngle + extraSpins + randomStop;
+  } else {
+    const targetIdx = parseInt(document.getElementById('manualSelect').value);
+    const baseTarget = getTargetAngle(targetIdx);
+    // Normalize so finalAngle > currentAngle + at least 5 full rotations
+    const minSpins = 7 * 2 * Math.PI;
+    let t = baseTarget;
+    while (t < currentAngle + minSpins) t += 2 * Math.PI;
+    finalAngle = t;
+  }
+
+  const startAngle = currentAngle;
+  const totalRotation = finalAngle - startAngle;
+  const duration = 4500; // ms
+  let startTime = null;
+
+  function easeOut(t) {
+    // Cubic ease-out
+    return 1 - Math.pow(1 - t, 3);
+  }
+
+  function animate(timestamp) {
+    if (!startTime) startTime = timestamp;
+    const elapsed = timestamp - startTime;
+    const progress = Math.min(elapsed / duration, 1);
+    const easedProgress = easeOut(progress);
+
+    currentAngle = startAngle + totalRotation * easedProgress;
+    drawWheel(currentAngle);
+
+    if (progress < 1) {
+      requestAnimationFrame(animate);
+    } else {
+      currentAngle = finalAngle;
+      drawWheel(currentAngle);
+      spinning = false;
+      showResult();
+    }
+  }
+
+  requestAnimationFrame(animate);
+}
+
+function showResult() {
+  // Pointer is at top = -PI/2. Find which segment is there.
+  // midArc of segment i = currentAngle + i*SLICE + SLICE/2
+  // We want midArc mod 2PI closest to -PI/2 mod 2PI = 3PI/2
+  const pointerAngle = (3 * Math.PI) / 2; // equivalent to -PI/2 normalized to [0,2PI)
+
+  let winner = 0;
+  let minDist = Infinity;
+
+  for (let i = 0; i < N; i++) {
+    let mid = currentAngle + i * SLICE + SLICE / 2;
+    // Normalize to [0, 2PI)
+    mid = ((mid % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+    let dist = Math.abs(mid - pointerAngle);
+    if (dist > Math.PI) dist = 2 * Math.PI - dist;
+    if (dist < minDist) {
+      minDist = dist;
+      winner = i;
+    }
+  }
+
+  const resultEl = document.getElementById('result');
+  resultEl.textContent = SEGMENTS[winner].label;
+  resultEl.style.color = SEGMENTS[winner].color;
+  setTimeout(() => resultEl.classList.add('visible'), 50);
+
+  const overlay = document.getElementById('popupOverlay');
+  const popupResult = document.getElementById('popupResult');
+  popupResult.textContent = SEGMENTS[winner].label;
+  popupResult.style.color = SEGMENTS[winner].color;
+  setTimeout(() => overlay.classList.add('visible'), 600);
+
+document.getElementById('popupClose').onclick = () => overlay.classList.remove('visible');
+overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.classList.remove('visible'); });
+}
+
+// ---- Settings panel ----
+const gearBtn = document.getElementById('gearBtn');
+const panel = document.getElementById('settingsPanel');
+const manualSelect = document.getElementById('manualSelect');
+
+gearBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  panel.classList.toggle('open');
+});
+
+document.addEventListener('click', () => panel.classList.remove('open'));
+panel.addEventListener('click', (e) => e.stopPropagation());
+
+document.querySelectorAll('input[name="mode"]').forEach(radio => {
+  radio.addEventListener('change', () => {
+    if (radio.value === 'manual') {
+      manualSelect.classList.add('visible');
+    } else {
+      manualSelect.classList.remove('visible');
+    }
+  });
+});
+</script>
+</body>
+</html>
