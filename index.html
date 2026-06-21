@@ -36,16 +36,19 @@
     align-items: center;
   }
 
-  /* Pointer arrow at top */
+  /* Pointer arrow on the right, pointing left into the wheel */
   .pointer {
+    position: absolute;
+    right: -6px;
+    top: 50%;
+    transform: translateY(-50%);
     width: 0;
     height: 0;
-    border-left: 16px solid transparent;
-    border-right: 16px solid transparent;
-    border-top: 32px solid #fff;
+    border-top: 16px solid transparent;
+    border-bottom: 16px solid transparent;
+    border-right: 32px solid #fff;
     filter: drop-shadow(0 2px 6px rgba(0,0,0,0.6));
     z-index: 10;
-    margin-bottom: -4px;
   }
 
   canvas {
@@ -253,13 +256,16 @@
     </label>
   </div>
   <select class="manual-select" id="manualSelect">
-    <option value="0">Laufen gehen</option>
-    <option value="1">Spazieren gehen</option>
-    <option value="2">Review checken</option>
-    <option value="3">Freund fragen</option>
-    <option value="4">Essen holen</option>
-    <option value="5">Quiz machen</option>
-    <option value="6">Eisbad</option>
+    <option value="0">1h Fremdsprache</option>
+    <option value="1">Laufen gehen</option>
+    <option value="2">Spazieren</option>
+    <option value="3">Review checken</option>
+    <option value="4">Kompliment machen</option>
+    <option value="5">Freund fragen</option>
+    <option value="6">Essen holen</option>
+    <option value="7">MC Speedrun</option>
+    <option value="8">Quiz machen</option>
+    <option value="9">Eisbad</option>
   </select>
 </div>
 
@@ -283,13 +289,16 @@
 
 <script>
 const SEGMENTS = [
-  { label: 'Laufen gehen',    color: '#FF4B6E' },
-  { label: 'Spazieren', color: '#FF9F1C' },
-  { label: 'Review checken',      color: '#2DCB75' },
-  { label: 'Freund fragen',   color: '#00B4D8' },
-  { label: 'Essen holen',     color: '#9B5DE5' },
-  { label: 'Quiz machen',     color: '#F72585' },
-  { label: 'Eisbad',          color: '#A8E6F0' },
+  { label: '1h Fremdsprache',  color: '#FFD166' },
+  { label: 'Laufen gehen',     color: '#FF4B6E' },
+  { label: 'Spazieren',        color: '#FF9F1C' },
+  { label: 'Review checken',   color: '#2DCB75' },
+  { label: 'Kompliment machen',color: '#06D6A0' },
+  { label: 'Freund fragen',    color: '#00B4D8' },
+  { label: 'Essen holen',      color: '#9B5DE5' },
+  { label: 'MC Speedrun',      color: '#EF476F' },
+  { label: 'Quiz machen',      color: '#F72585' },
+  { label: 'Eisbad',           color: '#A8E6F0' },
 ];
 
 const N = SEGMENTS.length;
@@ -314,6 +323,20 @@ window.addEventListener('resize', resizeCanvas);
 let currentAngle = 0; // radians, rotation of the wheel
 let spinning = false;
 
+function wrapLabel(text, maxLen, ctx) {
+  if (ctx.measureText(text).width <= maxLen) return [text];
+  const words = text.split(' ');
+  if (words.length === 1) return [text];
+  let best = null, bestDiff = Infinity;
+  for (let i = 1; i < words.length; i++) {
+    const l1 = words.slice(0, i).join(' ');
+    const l2 = words.slice(i).join(' ');
+    const diff = Math.abs(ctx.measureText(l1).width - ctx.measureText(l2).width);
+    if (diff < bestDiff) { bestDiff = diff; best = [l1, l2]; }
+  }
+  return best || [text];
+}
+
 function drawWheel(angle) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -333,37 +356,70 @@ function drawWheel(angle) {
     ctx.stroke();
 
     // Label
+    const mid = start + SLICE / 2;
     ctx.save();
     ctx.translate(cx, cy);
-    ctx.rotate(start + SLICE / 2);
-    const fontSize = Math.round(canvas.width * 0.041);
-    ctx.font = `bold ${fontSize}px "Segoe UI", system-ui, sans-serif`;
+    ctx.rotate(mid);
     ctx.shadowColor = 'transparent';
     ctx.shadowBlur = 0;
-    ctx.strokeStyle = 'rgba(0,0,0,0.9)';
-    ctx.lineWidth = 2.5;
     ctx.lineJoin = 'round';
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'right';
 
-    // Manual letter spacing
+    const outerX = R - 22;
+    const hubGap = Math.max(26, canvas.width * 0.07) + 10;
+    const anchorX = outerX;
+
     const text = SEGMENTS[i].label;
-    const letterSpacing = 1.5;
-    const totalWidth = text.split('').reduce((w, ch) => w + ctx.measureText(ch).width + letterSpacing, 0) - letterSpacing;
-    let xPos = R - 18 - totalWidth;
-    for (const ch of text) {
-      ctx.strokeText(ch, xPos, 6);
-      ctx.fillStyle = '#fff';
-      ctx.fillText(ch, xPos, 6);
-      xPos += ctx.measureText(ch).width + letterSpacing;
+    const maxLen = outerX - hubGap;
+    const baseFont = Math.round(canvas.width * 0.044);
+
+    let fontSize = baseFont;
+    let lines = [text];
+    for (; fontSize >= 9; fontSize--) {
+      ctx.font = `bold ${fontSize}px "Segoe UI", system-ui, sans-serif`;
+      lines = wrapLabel(text, maxLen, ctx);
+      const longest = Math.max(...lines.map(l => ctx.measureText(l).width));
+      if (longest <= maxLen) break;
     }
+    ctx.font = `bold ${fontSize}px "Segoe UI", system-ui, sans-serif`;
+    ctx.strokeStyle = 'rgba(0,0,0,0.85)';
+    ctx.lineWidth = Math.max(2, fontSize * 0.14);
+
+    const lineHeight = fontSize * 1.08;
+    const startY = -((lines.length - 1) * lineHeight) / 2;
+    lines.forEach((line, li) => {
+      const y = startY + li * lineHeight;
+      ctx.strokeText(line, anchorX, y);
+      ctx.fillStyle = '#fff';
+      ctx.fillText(line, anchorX, y);
+    });
     ctx.restore();
   }
 
-  // Center circle
+  // Outer rim
   ctx.beginPath();
-  ctx.arc(cx, cy, 22, 0, 2 * Math.PI);
-  ctx.fillStyle = '#0f0f13';
+  ctx.arc(cx, cy, R, 0, 2 * Math.PI);
+  ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+  ctx.lineWidth = 4;
+  ctx.stroke();
+
+  // Center hub
+  const hubR = Math.max(26, canvas.width * 0.07);
+  const grad = ctx.createRadialGradient(cx - hubR * 0.3, cy - hubR * 0.3, hubR * 0.1, cx, cy, hubR);
+  grad.addColorStop(0, '#2a2a38');
+  grad.addColorStop(1, '#0f0f13');
+  ctx.beginPath();
+  ctx.arc(cx, cy, hubR, 0, 2 * Math.PI);
+  ctx.fillStyle = grad;
   ctx.fill();
-  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+  ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+  // Inner accent ring
+  ctx.beginPath();
+  ctx.arc(cx, cy, hubR * 0.55, 0, 2 * Math.PI);
+  ctx.strokeStyle = 'rgba(255,255,255,0.12)';
   ctx.lineWidth = 2;
   ctx.stroke();
 }
@@ -377,13 +433,12 @@ function getMode() {
 }
 
 function getTargetAngle(targetSegmentIndex) {
-  // The pointer is at top (angle -PI/2 in standard coords, but since we draw from angle=0
-  // as "right", the top is at -PI/2). We want segment targetSegmentIndex to be centered at top.
-  // Segment i center (mid-arc) when wheel is at rotation `angle`:
-  //   midArc = angle + i*SLICE + SLICE/2
-  // We want midArc = -PI/2 + 2*PI*k  =>  angle = -PI/2 - i*SLICE - SLICE/2 + 2*PI*k
+  // The pointer is on the right (angle 0, since angle=0 is drawn pointing right).
+  // We want segment targetSegmentIndex centered at the pointer.
+  // Segment i center (mid-arc) at wheel rotation `angle`: midArc = angle + i*SLICE + SLICE/2
+  // We want midArc = 0 + 2*PI*k  =>  angle = -i*SLICE - SLICE/2 + 2*PI*k
 
-  const target = -Math.PI / 2 - (targetSegmentIndex * SLICE + SLICE / 2);
+  const target = -(targetSegmentIndex * SLICE + SLICE / 2);
   return target;
 }
 
@@ -586,7 +641,7 @@ function showResult() {
   // Pointer is at top = -PI/2. Find which segment is there.
   // midArc of segment i = currentAngle + i*SLICE + SLICE/2
   // We want midArc mod 2PI closest to -PI/2 mod 2PI = 3PI/2
-  const pointerAngle = (3 * Math.PI) / 2; // equivalent to -PI/2 normalized to [0,2PI)
+  const pointerAngle = 0; // pointer is on the right (3 o'clock)
 
   let winner = 0;
   let minDist = Infinity;
