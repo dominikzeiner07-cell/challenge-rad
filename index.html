@@ -179,28 +179,28 @@
   .gear-btn:hover { background: rgba(255,255,255,0.16); }
   .gear-btn svg { width: 22px; height: 22px; fill: #ccc; }
 
-  /* Navigation link to the other wheel */
-  .nav-link {
-    position: fixed;
-    top: 20px;
-    left: 20px;
+  /* Wheel chooser inside settings */
+  .wheel-switch { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+  .wheel-option {
     display: flex;
     align-items: center;
     gap: 8px;
-    height: 44px;
-    padding: 0 16px;
-    background: rgba(255,255,255,0.08);
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: #2a2a38;
     border: 1px solid rgba(255,255,255,0.12);
-    border-radius: 12px;
     color: #ddd;
     text-decoration: none;
-    font-size: 0.9rem;
+    font-size: 0.95rem;
     font-weight: 600;
-    letter-spacing: 0.02em;
-    transition: background 0.2s, transform 0.15s;
-    z-index: 100;
+    transition: background 0.2s;
   }
-  .nav-link:hover { background: rgba(255,255,255,0.16); transform: translateY(-1px); }
+  .wheel-option:hover { background: #34344a; }
+  .wheel-option.active {
+    background: linear-gradient(135deg, #6c63ff, #e040fb);
+    border-color: transparent;
+    color: #fff;
+  }
 
   /* Settings panel */
   .settings-panel {
@@ -260,9 +260,6 @@
 
 <h1>Challenge Rad</h1>
 
-<!-- Link to the other wheel -->
-<a class="nav-link" href="sprachen-rad.html">🌍 Sprachen Rad</a>
-
 <!-- Gear button -->
 <button class="gear-btn" id="gearBtn" title="Einstellungen">
   <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -272,6 +269,11 @@
 
 <!-- Settings panel -->
 <div class="settings-panel" id="settingsPanel">
+  <h3>Rad</h3>
+  <div class="wheel-switch">
+    <a href="index.html" class="wheel-option active">🎯 Challenge Rad</a>
+    <a href="sprachen-rad.html" class="wheel-option">🌍 Sprachen Rad</a>
+  </div>
   <h3>Spin-Modus</h3>
   <div class="mode-options">
     <label class="mode-option">
