@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sprachen Rad</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0f0f13;
+    color: #fff;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  h1 {
+    font-size: clamp(1.2rem, 5vw, 2rem);
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    margin-bottom: clamp(16px, 4vw, 32px);
+    background: linear-gradient(135deg, #fff 0%, #aaa 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .wheel-wrapper {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* Pointer arrow on the right, pointing left into the wheel */
+  .pointer {
+    position: absolute;
+    right: -6px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 0;
+    height: 0;
+    border-top: 16px solid transparent;
+    border-bottom: 16px solid transparent;
+    border-right: 32px solid #fff;
+    filter: drop-shadow(0 2px 6px rgba(0,0,0,0.6));
+    z-index: 10;
+  }
+
+  canvas {
+    border-radius: 50%;
+    box-shadow: 0 0 60px rgba(255,255,255,0.08), 0 0 120px rgba(100,100,255,0.05);
+    cursor: pointer;
+  }
+
+  .spin-btn {
+    margin-top: clamp(16px, 4vw, 32px);
+    padding: clamp(12px, 3vw, 16px) clamp(32px, 8vw, 56px);
+    font-size: clamp(1rem, 3vw, 1.2rem);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    background: linear-gradient(135deg, #6c63ff, #e040fb);
+    border: none;
+    border-radius: 50px;
+    color: #fff;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
+    box-shadow: 0 4px 24px rgba(108,99,255,0.4);
+  }
+
+  .spin-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px rgba(108,99,255,0.55);
+  }
+
+  .spin-btn:active:not(:disabled) { transform: translateY(0); }
+  .spin-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .result {
+    margin-top: clamp(12px, 3vw, 24px);
+    min-height: 50px;
+    text-align: center;
+    font-size: clamp(1.3rem, 5vw, 2rem);
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    opacity: 0;
+    transform: translateY(12px);
+    transition: opacity 0.5s, transform 0.5s;
+  }
+  .result.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* Popup overlay */
+  .popup-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.65);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.35s;
+  }
+  .popup-overlay.visible {
+    opacity: 1;
+    pointer-events: all;
+  }
+  .popup {
+    background: #1c1c26;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 24px;
+    padding: clamp(28px, 8vw, 48px) clamp(24px, 8vw, 56px);
+    text-align: center;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.6);
+    transform: scale(0.85);
+    transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1);
+    max-width: 380px;
+    width: 90%;
+  }
+  .popup-overlay.visible .popup {
+    transform: scale(1);
+  }
+  .popup-label {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: #888;
+    margin-bottom: 16px;
+  }
+  .popup-result {
+    font-size: clamp(1.6rem, 6vw, 2.4rem);
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    line-height: 1.2;
+    margin-bottom: 32px;
+  }
+  .popup-close {
+    padding: 14px 40px;
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    background: linear-gradient(135deg, #6c63ff, #e040fb);
+    border: none;
+    border-radius: 50px;
+    color: #fff;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s;
+    box-shadow: 0 4px 20px rgba(108,99,255,0.4);
+  }
+  .popup-close:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(108,99,255,0.55); }
+  .popup-close:active { transform: translateY(0); }
+
+  /* Gear icon */
+  .gear-btn {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    width: 44px;
+    height: 44px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+    z-index: 100;
+  }
+  .gear-btn:hover { background: rgba(255,255,255,0.16); }
+  .gear-btn svg { width: 22px; height: 22px; fill: #ccc; }
+
+  /* Settings panel */
+  .settings-panel {
+    position: fixed;
+    top: 74px;
+    right: 20px;
+    background: #1c1c26;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 16px;
+    padding: 20px;
+    min-width: 240px;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+    z-index: 99;
+    display: none;
+  }
+  .settings-panel.open { display: block; }
+
+  .settings-panel h3 {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #888;
+    margin-bottom: 14px;
+  }
+
+  .mode-options { display: flex; flex-direction: column; gap: 10px; }
+
+  .mode-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    color: #ddd;
+  }
+
+  .mode-option input[type="radio"] { accent-color: #6c63ff; width: 16px; height: 16px; }
+
+  .manual-select {
+    margin-top: 14px;
+    width: 100%;
+    padding: 10px 12px;
+    background: #2a2a38;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 10px;
+    color: #fff;
+    font-size: 0.95rem;
+    outline: none;
+    cursor: pointer;
+    display: none;
+  }
+  .manual-select.visible { display: block; }
+  .manual-select option { background: #1c1c26; }
+</style>
+</head>
+<body>
+
+<h1>Sprachen Rad</h1>
+
+<!-- Gear button -->
+<button class="gear-btn" id="gearBtn" title="Einstellungen">
+  <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <path d="M12 15.5A3.5 3.5 0 0 1 8.5 12 3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5m7.43-2.92c.04-.36.07-.73.07-1.08s-.03-.73-.07-1.08l2.34-1.83c.21-.16.27-.46.13-.7l-2.21-3.83c-.13-.23-.42-.31-.65-.23l-2.76 1.11c-.57-.44-1.18-.81-1.86-1.08L14.21 1.2C14.16.94 13.92.75 13.65.75h-3.3c-.27 0-.5.19-.55.45L9.53 3.58c-.68.27-1.3.64-1.86 1.08L4.91 3.55c-.23-.09-.52 0-.65.23L2.05 7.61c-.14.24-.08.54.13.7l2.34 1.83C4.47 10.53 4.44 10.85 4.44 11.18c0 .34.03.67.08 1H2.18c-.21.16-.27.46-.13.7l2.21 3.83c.13.23.42.31.65.23l2.76-1.11c.57.44 1.18.81 1.86 1.08l.27 2.38c.05.26.28.45.55.45h3.3c.27 0 .5-.19.55-.45l.27-2.38c.68-.27 1.3-.64 1.86-1.08l2.76 1.11c.23.09.52 0 .65-.23l2.21-3.83c.14-.24.08-.54-.13-.7z"/>
+  </svg>
+</button>
+
+<!-- Settings panel -->
+<div class="settings-panel" id="settingsPanel">
+  <h3>Spin-Modus</h3>
+  <div class="mode-options">
+    <label class="mode-option">
+      <input type="radio" name="mode" value="random" checked> Zufällig
+    </label>
+    <label class="mode-option">
+      <input type="radio" name="mode" value="manual"> Manuell
+    </label>
+  </div>
+  <select class="manual-select" id="manualSelect">
+    <option value="0">Spanisch</option>
+    <option value="1">Französisch</option>
+    <option value="2">Italienisch</option>
+    <option value="3">Japanisch</option>
+  </select>
+</div>
+
+<div class="wheel-wrapper">
+  <div class="pointer"></div>
+  <canvas id="wheel" width="460" height="460"></canvas>
+</div>
+
+<button class="spin-btn" id="spinBtn">DREHEN</button>
+
+<div class="result" id="result"></div>
+
+<!-- Popup -->
+<div class="popup-overlay" id="popupOverlay">
+  <div class="popup">
+    <div class="popup-label">DEINE SPRACHE</div>
+    <div class="popup-result" id="popupResult"></div>
+    <button class="popup-close" id="popupClose">OK</button>
+  </div>
+</div>
+
+<script>
+const SEGMENTS = [
+  { label: 'Spanisch',    color: '#FF9F1C' },
+  { label: 'Französisch', color: '#00B4D8' },
+  { label: 'Italienisch', color: '#2DCB75' },
+  { label: 'Japanisch',   color: '#F72585' },
+];
+
+const N = SEGMENTS.length;
+const SLICE = (2 * Math.PI) / N;
+const canvas = document.getElementById('wheel');
+const ctx = canvas.getContext('2d');
+
+let cx, cy, R;
+
+function resizeCanvas() {
+  const size = Math.min(window.innerWidth - 40, 460);
+  canvas.width = size;
+  canvas.height = size;
+  cx = size / 2;
+  cy = size / 2;
+  R = size / 2 - 4;
+  drawWheel(currentAngle);
+}
+
+window.addEventListener('resize', resizeCanvas);
+
+let currentAngle = 0; // radians, rotation of the wheel
+let spinning = false;
+
+function wrapLabel(text, maxLen, ctx) {
+  if (ctx.measureText(text).width <= maxLen) return [text];
+  const words = text.split(' ');
+  if (words.length === 1) return [text];
+  let best = null, bestDiff = Infinity;
+  for (let i = 1; i < words.length; i++) {
+    const l1 = words.slice(0, i).join(' ');
+    const l2 = words.slice(i).join(' ');
+    const diff = Math.abs(ctx.measureText(l1).width - ctx.measureText(l2).width);
+    if (diff < bestDiff) { bestDiff = diff; best = [l1, l2]; }
+  }
+  return best || [text];
+}
+
+function drawWheel(angle) {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  for (let i = 0; i < N; i++) {
+    const start = angle + i * SLICE;
+    const end = start + SLICE;
+
+    // Segment
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, R, start, end);
+    ctx.closePath();
+    ctx.fillStyle = SEGMENTS[i].color;
+    ctx.fill();
+    ctx.strokeStyle = '#0f0f13';
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+
+    // Label
+    const mid = start + SLICE / 2;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(mid);
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+    ctx.lineJoin = 'round';
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'right';
+
+    const outerX = R - 22;
+    const hubGap = Math.max(26, canvas.width * 0.07) + 10;
+    const anchorX = outerX;
+
+    const text = SEGMENTS[i].label;
+    const maxLen = outerX - hubGap;
+    const baseFont = Math.round(canvas.width * 0.044);
+
+    let fontSize = baseFont;
+    let lines = [text];
+    for (; fontSize >= 9; fontSize--) {
+      ctx.font = `bold ${fontSize}px "Segoe UI", system-ui, sans-serif`;
+      lines = wrapLabel(text, maxLen, ctx);
+      const longest = Math.max(...lines.map(l => ctx.measureText(l).width));
+      if (longest <= maxLen) break;
+    }
+    ctx.font = `bold ${fontSize}px "Segoe UI", system-ui, sans-serif`;
+    ctx.strokeStyle = 'rgba(0,0,0,0.85)';
+    ctx.lineWidth = Math.max(2, fontSize * 0.14);
+
+    const lineHeight = fontSize * 1.08;
+    const startY = -((lines.length - 1) * lineHeight) / 2;
+    lines.forEach((line, li) => {
+      const y = startY + li * lineHeight;
+      ctx.strokeText(line, anchorX, y);
+      ctx.fillStyle = '#fff';
+      ctx.fillText(line, anchorX, y);
+    });
+    ctx.restore();
+  }
+
+  // Outer rim
+  ctx.beginPath();
+  ctx.arc(cx, cy, R, 0, 2 * Math.PI);
+  ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+  ctx.lineWidth = 4;
+  ctx.stroke();
+
+  // Center hub
+  const hubR = Math.max(26, canvas.width * 0.07);
+  const grad = ctx.createRadialGradient(cx - hubR * 0.3, cy - hubR * 0.3, hubR * 0.1, cx, cy, hubR);
+  grad.addColorStop(0, '#2a2a38');
+  grad.addColorStop(1, '#0f0f13');
+  ctx.beginPath();
+  ctx.arc(cx, cy, hubR, 0, 2 * Math.PI);
+  ctx.fillStyle = grad;
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+  // Inner accent ring
+  ctx.beginPath();
+  ctx.arc(cx, cy, hubR * 0.55, 0, 2 * Math.PI);
+  ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+}
+
+resizeCanvas();
+
+// ---- Spin logic ----
+
+function getMode() {
+  return document.querySelector('input[name="mode"]:checked').value;
+}
+
+function getTargetAngle(targetSegmentIndex) {
+  // The pointer is on the right (angle 0, since angle=0 is drawn pointing right).
+  // We want segment targetSegmentIndex centered at the pointer.
+  // Segment i center (mid-arc) at wheel rotation `angle`: midArc = angle + i*SLICE + SLICE/2
+  // We want midArc = 0 + 2*PI*k  =>  angle = -i*SLICE - SLICE/2 + 2*PI*k
+
+  const target = -(targetSegmentIndex * SLICE + SLICE / 2);
+  return target;
+}
+
+document.getElementById('spinBtn').addEventListener('click', spin);
+
+function spin() {
+  if (spinning) return;
+  spinning = true;
+
+  const resultEl = document.getElementById('result');
+  resultEl.classList.remove('visible');
+  resultEl.textContent = '';
+
+  const mode = getMode();
+  let finalAngle;
+
+  if (mode === 'random') {
+    // Random full rotations + random stop
+    const extraSpins = (8 + Math.floor(Math.random() * 6)) * 2 * Math.PI;
+    const randomStop = Math.random() * 2 * Math.PI;
+    finalAngle = currentAngle + extraSpins + randomStop;
+  } else {
+    const targetIdx = parseInt(document.getElementById('manualSelect').value);
+    // Random offset within the segment (avoid edges by 10% of slice)
+    const jitter = (Math.random() - 0.5) * SLICE * 0.8;
+    const baseTarget = getTargetAngle(targetIdx) - jitter;
+    // Normalize so finalAngle > currentAngle + at least 5 full rotations
+    const minSpins = 7 * 2 * Math.PI;
+    let t = baseTarget;
+    while (t < currentAngle + minSpins) t += 2 * Math.PI;
+    finalAngle = t;
+  }
+
+  const startAngle = currentAngle;
+  const totalRotation = finalAngle - startAngle;
+  const duration = 4500; // ms
+  let startTime = null;
+
+  // Schedule all ticks up front via Web Audio API for precise timing
+  const audioCtxNow = getAudioCtx();
+  scheduleTicks(startAngle, totalRotation, duration, audioCtxNow.currentTime);
+
+  function easeOut(t) {
+    // Cubic ease-out
+    return 1 - Math.pow(1 - t, 3);
+  }
+
+  function animate(timestamp) {
+    if (!startTime) startTime = timestamp;
+    const elapsed = timestamp - startTime;
+    const progress = Math.min(elapsed / duration, 1);
+    const easedProgress = easeOut(progress);
+
+    currentAngle = startAngle + totalRotation * easedProgress;
+    drawWheel(currentAngle);
+
+    if (progress < 1) {
+      requestAnimationFrame(animate);
+    } else {
+      currentAngle = finalAngle;
+      drawWheel(currentAngle);
+      spinning = false;
+      showResult();
+    }
+  }
+
+  requestAnimationFrame(animate);
+}
+
+// ---- Audio ----
+let audioCtx = null;
+
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+
+function playTick(volume) {
+  const ctx = getAudioCtx();
+  const buf = ctx.createBuffer(1, ctx.sampleRate * 0.04, ctx.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < data.length; i++) {
+    // Short noise burst that decays fast — sounds like a wheel tick
+    data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / data.length, 6);
+  }
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+
+  const gain = ctx.createGain();
+  gain.gain.value = Math.max(0.05, Math.min(1, volume));
+
+  // Slight bandpass to make it more "clicky"
+  const filter = ctx.createBiquadFilter();
+  filter.type = 'bandpass';
+  filter.frequency.value = 1800;
+  filter.Q.value = 0.8;
+
+  src.connect(filter);
+  filter.connect(gain);
+  gain.connect(ctx.destination);
+  src.start();
+}
+
+function scheduleTicks(startAngle, totalRotation, duration, startTime) {
+  const ctx = getAudioCtx();
+  const ticksPerRev = N; // one tick per segment boundary
+  const totalRadians = Math.abs(totalRotation);
+  const totalTicks = Math.floor(totalRadians / SLICE);
+
+  for (let i = 0; i < totalTicks; i++) {
+    // At which fraction of total rotation does this tick happen?
+    const radAtTick = (i + 1) * SLICE;
+    const fraction = radAtTick / totalRadians;
+
+    // Invert easeOut to find the time fraction for this rotation fraction
+    // easeOut(t) = 1 - (1-t)^3  =>  t = 1 - (1 - fraction)^(1/3)
+    const timeFraction = 1 - Math.pow(1 - fraction, 1 / 3);
+    const tickTime = (startTime - ctx.currentTime) + timeFraction * (duration / 1000);
+
+    if (tickTime < 0) continue;
+
+    // Volume: loud at start, quiet at end
+    const speed = 1 - timeFraction; // 1 = fast start, 0 = slow end
+    const vol = 0.15 + speed * 0.85;
+
+    const buf = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * 0.04), ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let j = 0; j < data.length; j++) {
+      data[j] = (Math.random() * 2 - 1) * Math.pow(1 - j / data.length, 6);
+    }
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+
+    const gain = ctx.createGain();
+    gain.gain.value = Math.max(0.05, Math.min(1, vol));
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.value = 1800;
+    filter.Q.value = 0.8;
+
+    src.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+    src.start(ctx.currentTime + tickTime);
+  }
+}
+
+function playResultSound() {
+  const ctx = getAudioCtx();
+  const now = ctx.currentTime;
+
+  // Short upbeat fanfare: three rising notes + a shimmer
+  const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+  const times = [0, 0.12, 0.24, 0.38];
+  const durations = [0.18, 0.18, 0.18, 0.45];
+
+  notes.forEach((freq, i) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = i === 3 ? 'sine' : 'triangle';
+    osc.frequency.value = freq;
+
+    const t = now + times[i];
+    const dur = durations[i];
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(0.28, t + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(t);
+    osc.stop(t + dur);
+  });
+
+  // Shimmer: high-freq noise burst
+  const shimmerBuf = ctx.createBuffer(1, ctx.sampleRate * 0.35, ctx.sampleRate);
+  const shimmerData = shimmerBuf.getChannelData(0);
+  for (let i = 0; i < shimmerData.length; i++) {
+    shimmerData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / shimmerData.length, 2);
+  }
+  const shimmerSrc = ctx.createBufferSource();
+  shimmerSrc.buffer = shimmerBuf;
+
+  const shimmerFilter = ctx.createBiquadFilter();
+  shimmerFilter.type = 'highpass';
+  shimmerFilter.frequency.value = 6000;
+
+  const shimmerGain = ctx.createGain();
+  shimmerGain.gain.value = 0.12;
+
+  shimmerSrc.connect(shimmerFilter);
+  shimmerFilter.connect(shimmerGain);
+  shimmerGain.connect(ctx.destination);
+  shimmerSrc.start(now + 0.3);
+}
+
+function showResult() {
+  // Pointer is on the right (angle 0). Find which segment is there.
+  // midArc of segment i = currentAngle + i*SLICE + SLICE/2
+  const pointerAngle = 0; // pointer is on the right (3 o'clock)
+
+  let winner = 0;
+  let minDist = Infinity;
+
+  for (let i = 0; i < N; i++) {
+    let mid = currentAngle + i * SLICE + SLICE / 2;
+    // Normalize to [0, 2PI)
+    mid = ((mid % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+    let dist = Math.abs(mid - pointerAngle);
+    if (dist > Math.PI) dist = 2 * Math.PI - dist;
+    if (dist < minDist) {
+      minDist = dist;
+      winner = i;
+    }
+  }
+
+  const resultEl = document.getElementById('result');
+  resultEl.textContent = SEGMENTS[winner].label;
+  resultEl.style.color = SEGMENTS[winner].color;
+  setTimeout(() => resultEl.classList.add('visible'), 50);
+
+  const overlay = document.getElementById('popupOverlay');
+  const popupResult = document.getElementById('popupResult');
+  popupResult.textContent = SEGMENTS[winner].label;
+  popupResult.style.color = SEGMENTS[winner].color;
+  setTimeout(() => { overlay.classList.add('visible'); playResultSound(); }, 600);
+
+document.getElementById('popupClose').onclick = () => overlay.classList.remove('visible');
+overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.classList.remove('visible'); });
+}
+
+// ---- Settings panel ----
+const gearBtn = document.getElementById('gearBtn');
+const panel = document.getElementById('settingsPanel');
+const manualSelect = document.getElementById('manualSelect');
+
+gearBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  panel.classList.toggle('open');
+});
+
+document.addEventListener('click', () => panel.classList.remove('open'));
+panel.addEventListener('click', (e) => e.stopPropagation());
+
+document.querySelectorAll('input[name="mode"]').forEach(radio => {
+  radio.addEventListener('change', () => {
+    if (radio.value === 'manual') {
+      manualSelect.classList.add('visible');
+    } else {
+      manualSelect.classList.remove('visible');
+    }
+  });
+});
+</script>
+</body>
+</html>
