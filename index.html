@@ -588,7 +588,7 @@ function scheduleTicks(startAngle, totalRotation, duration, startTime) {
 
     const t0 = ctx.currentTime + tickTime;
     // Skip ticks that would play too soon after the previous one (keeps it calm)
-    if (t0 - lastTick < 0.12) continue;
+    if (t0 - lastTick < 0.06) continue;
     lastTick = t0;
 
     const speed = 1 - timeFraction; // 1 = fast start, 0 = slow end
