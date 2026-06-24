@@ -284,7 +284,7 @@
     </label>
   </div>
   <select class="manual-select" id="manualSelect">
-    <option value="0">1h Fremdsprache</option>
+    <option value="0">Fremdsprache 1h</option>
     <option value="1">Laufen gehen</option>
     <option value="2">Spazieren</option>
     <option value="3">Review checken</option>
@@ -317,7 +317,7 @@
 
 <script>
 const SEGMENTS = [
-  { label: '1h Fremdsprache',  color: '#FFD166' },
+  { label: 'Fremdsprache 1h',  color: '#FFD166' },
   { label: 'Laufen gehen',     color: '#FF4B6E' },
   { label: 'Spazieren',        color: '#FF9F1C' },
   { label: 'Review checken',   color: '#2DCB75' },
@@ -588,34 +588,35 @@ function scheduleTicks(startAngle, totalRotation, duration, startTime) {
 
     if (tickTime < 0) continue;
 
-    // Volume: a touch stronger at the start, softer at the end
+    // Digital/futuristic blip: a short synth tone with a quick pitch drop
     const speed = 1 - timeFraction; // 1 = fast start, 0 = slow end
-    const vol = 0.08 + speed * 0.32;
+    const vol = 0.05 + speed * 0.16;
+    const t0 = ctx.currentTime + tickTime;
 
-    const buf = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * 0.05), ctx.sampleRate);
-    const data = buf.getChannelData(0);
-    for (let j = 0; j < data.length; j++) {
-      const p = j / data.length;
-      const attack = Math.min(1, p / 0.12);   // soft onset, no sharp click
-      const decay = Math.pow(1 - p, 4);       // gentler decay
-      data[j] = (Math.random() * 2 - 1) * attack * decay;
-    }
-    const src = ctx.createBufferSource();
-    src.buffer = buf;
+    // Pitch falls as the wheel slows down
+    const freq = 520 + speed * 680; // ~1200 Hz fast → ~520 Hz slow
+
+    const osc = ctx.createOscillator();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(freq * 1.6, t0);
+    osc.frequency.exponentialRampToValueAtTime(freq, t0 + 0.025);
 
     const gain = ctx.createGain();
-    gain.gain.value = Math.max(0.04, Math.min(1, vol));
+    gain.gain.setValueAtTime(0.0001, t0);
+    gain.gain.exponentialRampToValueAtTime(vol, t0 + 0.003);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.07);
 
-    // Low-pass rounds off the harsh, piercing high frequencies
+    // Resonant low-pass gives it a clean synthy "zap" without harshness
     const filter = ctx.createBiquadFilter();
     filter.type = 'lowpass';
-    filter.frequency.value = 900;
-    filter.Q.value = 0.6;
+    filter.frequency.value = 3200;
+    filter.Q.value = 6;
 
-    src.connect(filter);
+    osc.connect(filter);
     filter.connect(gain);
     gain.connect(ctx.destination);
-    src.start(ctx.currentTime + tickTime);
+    osc.start(t0);
+    osc.stop(t0 + 0.09);
   }
 }
 
