@@ -560,51 +560,44 @@ function playTick(volume) {
 
 function scheduleTicks(startAngle, totalRotation, duration, startTime) {
   const ctx = getAudioCtx();
-  const ticksPerRev = N; // one tick per segment boundary
   const totalRadians = Math.abs(totalRotation);
   const totalTicks = Math.floor(totalRadians / SLICE);
 
+  let lastTick = -1; // throttle so the fast early ticks don't bunch up
+
   for (let i = 0; i < totalTicks; i++) {
-    // At which fraction of total rotation does this tick happen?
     const radAtTick = (i + 1) * SLICE;
     const fraction = radAtTick / totalRadians;
 
-    // Invert easeOut to find the time fraction for this rotation fraction
-    // easeOut(t) = 1 - (1-t)^3  =>  t = 1 - (1 - fraction)^(1/3)
+    // Invert easeOut to find the time for this rotation fraction
     const timeFraction = 1 - Math.pow(1 - fraction, 1 / 3);
     const tickTime = (startTime - ctx.currentTime) + timeFraction * (duration / 1000);
-
     if (tickTime < 0) continue;
 
-    // Digital/futuristic blip: a short synth tone with a quick pitch drop
-    const speed = 1 - timeFraction; // 1 = fast start, 0 = slow end
-    const vol = 0.05 + speed * 0.16;
     const t0 = ctx.currentTime + tickTime;
+    // Skip ticks that would play too soon after the previous one (keeps it calm)
+    if (t0 - lastTick < 0.12) continue;
+    lastTick = t0;
 
-    // Pitch falls as the wheel slows down
-    const freq = 520 + speed * 680; // ~1200 Hz fast → ~520 Hz slow
+    const speed = 1 - timeFraction; // 1 = fast start, 0 = slow end
+    const vol = 0.03 + speed * 0.06;     // soft and quiet
+
+    // Warm, soft sine tone — low and rounded, drops a little as it slows
+    const freq = 300 + speed * 160;      // ~460 Hz fast → ~300 Hz slow
 
     const osc = ctx.createOscillator();
-    osc.type = 'square';
-    osc.frequency.setValueAtTime(freq * 1.6, t0);
-    osc.frequency.exponentialRampToValueAtTime(freq, t0 + 0.025);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, t0);
 
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(0.0001, t0);
-    gain.gain.exponentialRampToValueAtTime(vol, t0 + 0.003);
-    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.07);
+    gain.gain.exponentialRampToValueAtTime(vol, t0 + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.14);
 
-    // Resonant low-pass gives it a clean synthy "zap" without harshness
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.value = 3200;
-    filter.Q.value = 6;
-
-    osc.connect(filter);
-    filter.connect(gain);
+    osc.connect(gain);
     gain.connect(ctx.destination);
     osc.start(t0);
-    osc.stop(t0 + 0.09);
+    osc.stop(t0 + 0.16);
   }
 }
 
@@ -687,7 +680,7 @@ function showResult() {
   const popupResult = document.getElementById('popupResult');
   popupResult.textContent = SEGMENTS[winner].label;
   popupResult.style.color = SEGMENTS[winner].color;
-  setTimeout(() => { overlay.classList.add('visible'); playResultSound(); }, 150);
+  overlay.classList.add('visible');
 
 document.getElementById('popupClose').onclick = () => overlay.classList.remove('visible');
 overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.classList.remove('visible'); });
