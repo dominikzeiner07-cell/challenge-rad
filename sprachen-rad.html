@@ -576,25 +576,29 @@ function scheduleTicks(startAngle, totalRotation, duration, startTime) {
 
     if (tickTime < 0) continue;
 
-    // Volume: loud at start, quiet at end
+    // Volume: a touch stronger at the start, softer at the end
     const speed = 1 - timeFraction; // 1 = fast start, 0 = slow end
-    const vol = 0.15 + speed * 0.85;
+    const vol = 0.08 + speed * 0.32;
 
-    const buf = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * 0.04), ctx.sampleRate);
+    const buf = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * 0.05), ctx.sampleRate);
     const data = buf.getChannelData(0);
     for (let j = 0; j < data.length; j++) {
-      data[j] = (Math.random() * 2 - 1) * Math.pow(1 - j / data.length, 6);
+      const p = j / data.length;
+      const attack = Math.min(1, p / 0.12);   // soft onset, no sharp click
+      const decay = Math.pow(1 - p, 4);       // gentler decay
+      data[j] = (Math.random() * 2 - 1) * attack * decay;
     }
     const src = ctx.createBufferSource();
     src.buffer = buf;
 
     const gain = ctx.createGain();
-    gain.gain.value = Math.max(0.05, Math.min(1, vol));
+    gain.gain.value = Math.max(0.04, Math.min(1, vol));
 
+    // Low-pass rounds off the harsh, piercing high frequencies
     const filter = ctx.createBiquadFilter();
-    filter.type = 'bandpass';
-    filter.frequency.value = 1800;
-    filter.Q.value = 0.8;
+    filter.type = 'lowpass';
+    filter.frequency.value = 900;
+    filter.Q.value = 0.6;
 
     src.connect(filter);
     filter.connect(gain);
@@ -682,7 +686,7 @@ function showResult() {
   const popupResult = document.getElementById('popupResult');
   popupResult.textContent = SEGMENTS[winner].label;
   popupResult.style.color = SEGMENTS[winner].color;
-  setTimeout(() => { overlay.classList.add('visible'); playResultSound(); }, 600);
+  setTimeout(() => { overlay.classList.add('visible'); playResultSound(); }, 150);
 
 document.getElementById('popupClose').onclick = () => overlay.classList.remove('visible');
 overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.classList.remove('visible'); });
